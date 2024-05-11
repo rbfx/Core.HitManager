@@ -17,6 +17,8 @@ HitOwner::HitOwner(Context* context)
 void HitOwner::RegisterObject(Context* context)
 {
     context->RegisterFactory<HitOwner>(Category_User);
+
+    URHO3D_ACCESSOR_ATTRIBUTE("Is Enabled", IsEnabled, SetEnabled, bool, true, AM_DEFAULT);
 }
 
 const HitInfo* HitOwner::GetHitInfo(HitId id) const
@@ -29,8 +31,8 @@ void HitOwner::UpdateEvents()
 {
     for (HitInfo& ongoingHit : hits_)
     {
-        const bool isActive = ongoingHit.trigger_ && ongoingHit.detector_ && ongoingHit.trigger_->IsEnabled()
-            && (ongoingHit.trigger_->GetHitOwner() != ongoingHit.detector_->GetHitOwner());
+        const bool isActive = IsEnabled() && ongoingHit.trigger_ && ongoingHit.detector_
+            && ongoingHit.trigger_->IsEnabledForDetector(ongoingHit.detector_);
         if (ongoingHit.isActive_ != isActive)
         {
             ongoingHit.isActive_ = isActive;
@@ -48,7 +50,7 @@ void HitOwner::AddOngoingHit(HitDetector* detector, HitTrigger* trigger)
 {
     const WeakPtr<HitDetector> weakDetector{detector};
     const WeakPtr<HitTrigger> weakTrigger{trigger};
-    const bool isActive = trigger->IsEnabled() && (trigger->GetHitOwner() != detector->GetHitOwner());
+    const bool isActive = IsEnabled() && trigger->IsEnabledForDetector(detector);
     hits_.emplace_back(HitInfo{weakDetector, weakTrigger, isActive, GetNextId()});
     if (isActive)
         OnHitStarted(hits_.back());
@@ -114,6 +116,12 @@ HitComponent::~HitComponent()
         rigidBody_->Remove();
 }
 
+bool HitComponent::IsSelfAndOwnerEnabled()
+{
+    HitOwner* owner = GetHitOwner();
+    return IsEnabled() && owner && owner->IsEnabled();
+}
+
 HitOwner* HitComponent::GetHitOwner()
 {
     HitOwner* hitOwner = hitOwner_;
@@ -153,11 +161,31 @@ void HitTrigger::RegisterObject(Context* context)
     context->RegisterFactory<HitTrigger>(Category_User);
 
     URHO3D_ACCESSOR_ATTRIBUTE("Is Enabled", IsEnabled, SetEnabled, bool, true, AM_DEFAULT);
+    URHO3D_ACCESSOR_ATTRIBUTE("Velocity Threshold", GetVelocityThreshold, SetVelocityThreshold, float, 0.0f, AM_DEFAULT);
+}
+
+bool HitTrigger::IsEnabledForDetector(HitDetector* hitDetector)
+{
+    return IsSelfAndOwnerEnabled() && (GetHitOwner() != hitDetector->GetHitOwner()) && IsVelocityThresholdSatisfied();
 }
 
 void HitTrigger::SetupRigidBody(RigidBody* rigidBody)
 {
     rigidBody->SetTrigger(true);
+    rigidBody->SetKinematic(true);
+    rigidBody->SetMass(1.0f);
+}
+
+float HitTrigger::GetRigidBodyVelocity() const
+{
+    RigidBody* rigidBody = GetRigidBody();
+    return rigidBody ? rigidBody->GetLinearVelocity().Length() : 0.0f;
+}
+
+bool HitTrigger::IsVelocityThresholdSatisfied() const
+{
+    const float velocity = GetRigidBodyVelocity();
+    return velocityThreshold_ == 0.0f || velocity >= velocityThreshold_;
 }
 
 void HitDetector::RegisterObject(Context* context)

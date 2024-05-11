@@ -74,11 +74,14 @@ public:
     ~HitComponent() override;
 
     HitOwner* GetHitOwner();
+    bool IsSelfAndOwnerEnabled();
 
 protected:
     void OnNodeSet(Node* previousNode, Node* currentNode) override;
 
     virtual void SetupRigidBody(RigidBody* rigidBody) {}
+
+    RigidBody* GetRigidBody() const { return rigidBody_; }
 
 private:
     WeakPtr<RigidBody> rigidBody_;
@@ -93,8 +96,21 @@ public:
     using HitComponent::HitComponent;
     static void RegisterObject(Context* context);
 
+    bool IsEnabledForDetector(HitDetector* hitDetector);
+
+    /// Attributes.
+    /// @{
+    void SetVelocityThreshold(float value) { velocityThreshold_ = value; }
+    float GetVelocityThreshold() const { return velocityThreshold_; }
+    /// @}
+
 private:
     void SetupRigidBody(RigidBody* rigidBody) override;
+
+    float GetRigidBodyVelocity() const;
+    bool IsVelocityThresholdSatisfied() const;
+
+    float velocityThreshold_{};
 };
 
 class PLUGIN_CORE_HITMANAGER_API HitDetector : public HitComponent
