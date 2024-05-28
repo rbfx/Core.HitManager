@@ -18,7 +18,10 @@ void HitManager::RegisterObject(Context* context)
 {
     context->RegisterFactory<HitManager>(Category_User);
 
-    URHO3D_ATTRIBUTE("Collision Mask", unsigned, collisionMask_, DefaultCollisionMask, AM_DEFAULT);
+    URHO3D_ATTRIBUTE("Trigger Collision Mask", unsigned, triggerCollisionMask_, DefaultCollisionMask, AM_DEFAULT);
+    URHO3D_ATTRIBUTE("Trigger Collision Layer", unsigned, triggerCollisionLayer_, DefaultCollisionLayer, AM_DEFAULT);
+    URHO3D_ATTRIBUTE("Detector Collision Mask", unsigned, detectorCollisionMask_, DefaultCollisionMask, AM_DEFAULT);
+    URHO3D_ATTRIBUTE("Detector Collision Layer", unsigned, detectorCollisionLayer_, DefaultCollisionLayer, AM_DEFAULT);
 }
 
 void HitManager::EnumerateActiveHits(ea::vector<ea::pair<HitOwner*, const HitInfo*>>& hits)

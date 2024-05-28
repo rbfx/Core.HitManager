@@ -144,15 +144,12 @@ void HitComponent::OnNodeSet(Node* previousNode, Node* currentNode)
     }
     else
     {
-        auto hitManager = node_->GetScene()->GetOrCreateComponent<HitManager>();
-        const unsigned collisionMask = hitManager->GetCollisionMask();
-
         auto rigidBody = node_->GetOrCreateComponent<RigidBody>();
         rigidBody->SetTemporary(true);
-        rigidBody->SetCollisionLayerAndMask(collisionMask, collisionMask);
-
         rigidBody_ = rigidBody;
-        SetupRigidBody(rigidBody);
+
+        auto hitManager = node_->GetScene()->GetOrCreateComponent<HitManager>();
+        SetupRigidBody(hitManager, rigidBody);
     }
 }
 
@@ -169,8 +166,12 @@ bool HitTrigger::IsEnabledForDetector(HitDetector* hitDetector)
     return IsSelfAndOwnerEnabled() && (GetHitOwner() != hitDetector->GetHitOwner()) && IsVelocityThresholdSatisfied();
 }
 
-void HitTrigger::SetupRigidBody(RigidBody* rigidBody)
+void HitTrigger::SetupRigidBody(HitManager* hitManager, RigidBody* rigidBody)
 {
+    const unsigned layer = hitManager->GetTriggerCollisionLayer();
+    const unsigned mask = hitManager->GetTriggerCollisionMask();
+
+    rigidBody->SetCollisionLayerAndMask(layer, mask);
     rigidBody->SetTrigger(true);
     rigidBody->SetKinematic(true);
     rigidBody->SetMass(1.0f);
@@ -193,8 +194,12 @@ void HitDetector::RegisterObject(Context* context)
     context->RegisterFactory<HitDetector>(Category_User);
 }
 
-void HitDetector::SetupRigidBody(RigidBody* rigidBody)
+void HitDetector::SetupRigidBody(HitManager* hitManager, RigidBody* rigidBody)
 {
+    const unsigned layer = hitManager->GetDetectorCollisionLayer();
+    const unsigned mask = hitManager->GetDetectorCollisionMask();
+
+    rigidBody->SetCollisionLayerAndMask(layer, mask);
     rigidBody->SetKinematic(true);
     rigidBody->SetMass(1.0f);
 

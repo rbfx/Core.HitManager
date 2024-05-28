@@ -79,7 +79,7 @@ public:
 protected:
     void OnNodeSet(Node* previousNode, Node* currentNode) override;
 
-    virtual void SetupRigidBody(RigidBody* rigidBody) {}
+    virtual void SetupRigidBody(HitManager* hitManager, RigidBody* rigidBody) {}
 
     RigidBody* GetRigidBody() const { return rigidBody_; }
 
@@ -105,7 +105,7 @@ public:
     /// @}
 
 private:
-    void SetupRigidBody(RigidBody* rigidBody) override;
+    void SetupRigidBody(HitManager* hitManager, RigidBody* rigidBody) override;
 
     float GetRigidBodyVelocity() const;
     bool IsVelocityThresholdSatisfied() const;
@@ -122,7 +122,7 @@ public:
     static void RegisterObject(Context* context);
 
 private:
-    void SetupRigidBody(RigidBody* rigidBody) override;
+    void SetupRigidBody(HitManager* hitManager, RigidBody* rigidBody) override;
 
     void OnHitStarted(HitTrigger* hitTrigger);
     void OnHitStopped(HitTrigger* hitTrigger);

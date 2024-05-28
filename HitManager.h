@@ -34,6 +34,7 @@ class PLUGIN_CORE_HITMANAGER_API HitManager : public TrackedComponentRegistryBas
 
 public:
     static constexpr unsigned DefaultCollisionMask = 0x7000;
+    static constexpr unsigned DefaultCollisionLayer = 0x7000;
 
     HitManager(Context* context);
     static void RegisterObject(Context* context);
@@ -41,8 +42,17 @@ public:
     /// Enumerate all active hits happening in the scene.
     void EnumerateActiveHits(ea::vector<ea::pair<HitOwner*, const HitInfo*>>& hits);
 
-    void SetCollisionMask(unsigned collisionMask) { collisionMask_ = collisionMask; }
-    unsigned GetCollisionMask() const { return collisionMask_; }
+    /// Attributes.
+    /// @{
+    void SetTriggerCollisionMask(unsigned collisionMask) { triggerCollisionMask_ = collisionMask; }
+    unsigned GetTriggerCollisionMask() const { return triggerCollisionMask_; }
+    void SetTriggerCollisionLayer(unsigned collisionLayer) { triggerCollisionLayer_ = collisionLayer; }
+    unsigned GetTriggerCollisionLayer() const { return triggerCollisionLayer_; }
+    void SetDetectorCollisionMask(unsigned collisionMask) { detectorCollisionMask_ = collisionMask; }
+    unsigned GetDetectorCollisionMask() const { return detectorCollisionMask_; }
+    void SetDetectorCollisionLayer(unsigned collisionLayer) { detectorCollisionLayer_ = collisionLayer; }
+    unsigned GetDetectorCollisionLayer() const { return detectorCollisionLayer_; }
+    /// @}
 
 protected:
     /// Implement TrackedComponentRegistryBase.
@@ -54,7 +64,10 @@ protected:
 private:
     void Update();
 
-    unsigned collisionMask_{DefaultCollisionMask};
+    unsigned triggerCollisionMask_{DefaultCollisionMask};
+    unsigned triggerCollisionLayer_{DefaultCollisionLayer};
+    unsigned detectorCollisionMask_{DefaultCollisionMask};
+    unsigned detectorCollisionLayer_{DefaultCollisionLayer};
 };
 
 } // namespace Urho3D
