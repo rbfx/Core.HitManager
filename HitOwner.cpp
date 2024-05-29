@@ -106,7 +106,7 @@ void HitOwner::OnHitStopped(const HitInfo& hit)
 }
 
 HitComponent::HitComponent(Context* context)
-    : Component(context)
+    : LogicComponent(context)
 {
 }
 
@@ -136,20 +136,16 @@ HitOwner* HitComponent::GetHitOwner()
     return hitOwner;
 }
 
-void HitComponent::OnNodeSet(Node* previousNode, Node* currentNode)
+void HitComponent::DelayedStart()
 {
-    if (!node_ || !node_->GetScene())
+    rigidBody_ = node_->GetComponent<RigidBody>();
+
+    if (!rigidBody_)
     {
-        rigidBody_ = nullptr;
-    }
-    else
-    {
-        auto rigidBody = node_->GetOrCreateComponent<RigidBody>();
-        rigidBody->SetTemporary(true);
-        rigidBody_ = rigidBody;
+        rigidBody_ = node_->CreateComponent<RigidBody>();
 
         auto hitManager = node_->GetScene()->GetOrCreateComponent<HitManager>();
-        SetupRigidBody(hitManager, rigidBody);
+        SetupRigidBody(hitManager, rigidBody_);
     }
 }
 
@@ -194,14 +190,9 @@ void HitDetector::RegisterObject(Context* context)
     context->RegisterFactory<HitDetector>(Category_User);
 }
 
-void HitDetector::SetupRigidBody(HitManager* hitManager, RigidBody* rigidBody)
+void HitDetector::DelayedStart()
 {
-    const unsigned layer = hitManager->GetDetectorCollisionLayer();
-    const unsigned mask = hitManager->GetDetectorCollisionMask();
-
-    rigidBody->SetCollisionLayerAndMask(layer, mask);
-    rigidBody->SetKinematic(true);
-    rigidBody->SetMass(1.0f);
+    HitComponent::DelayedStart();
 
     SubscribeToEvent(node_, E_NODECOLLISIONSTART,
         [&](VariantMap& eventData)
@@ -224,6 +215,16 @@ void HitDetector::SetupRigidBody(HitManager* hitManager, RigidBody* rigidBody)
 
         OnHitStopped(hitTrigger);
     });
+}
+
+void HitDetector::SetupRigidBody(HitManager* hitManager, RigidBody* rigidBody)
+{
+    const unsigned layer = hitManager->GetDetectorCollisionLayer();
+    const unsigned mask = hitManager->GetDetectorCollisionMask();
+
+    rigidBody->SetCollisionLayerAndMask(layer, mask);
+    rigidBody->SetKinematic(true);
+    rigidBody->SetMass(1.0f);
 }
 
 void HitDetector::OnHitStarted(HitTrigger* hitTrigger)

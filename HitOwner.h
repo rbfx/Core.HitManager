@@ -2,6 +2,8 @@
 
 #include "HitManager.h"
 
+#include <Urho3D/Scene/LogicComponent.h>
+
 namespace Urho3D
 {
 
@@ -65,9 +67,9 @@ private:
     HitId nextId_{};
 };
 
-class PLUGIN_CORE_HITMANAGER_API HitComponent : public Component
+class PLUGIN_CORE_HITMANAGER_API HitComponent : public LogicComponent
 {
-    URHO3D_OBJECT(HitComponent, Component);
+    URHO3D_OBJECT(HitComponent, LogicComponent);
 
 public:
     HitComponent(Context* context);
@@ -76,9 +78,12 @@ public:
     HitOwner* GetHitOwner();
     bool IsSelfAndOwnerEnabled();
 
-protected:
-    void OnNodeSet(Node* previousNode, Node* currentNode) override;
+    /// Implement LogicComponent.
+    /// @{
+    void DelayedStart() override;
+    /// @}
 
+protected:
     virtual void SetupRigidBody(HitManager* hitManager, RigidBody* rigidBody) {}
 
     RigidBody* GetRigidBody() const { return rigidBody_; }
@@ -120,6 +125,11 @@ class PLUGIN_CORE_HITMANAGER_API HitDetector : public HitComponent
 public:
     using HitComponent::HitComponent;
     static void RegisterObject(Context* context);
+
+    /// Implement LogicComponent.
+    /// @{
+    void DelayedStart() override;
+    /// @}
 
 private:
     void SetupRigidBody(HitManager* hitManager, RigidBody* rigidBody) override;
