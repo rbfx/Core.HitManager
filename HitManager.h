@@ -7,24 +7,26 @@
 namespace Urho3D
 {
 
-struct HitInfo;
+struct GroupHitInfo;
 class HitDetector;
 class HitOwner;
 class HitTrigger;
 
 URHO3D_EVENT(E_HITSTARTED, HitStarted)
 {
-    URHO3D_PARAM(P_RECEIVER, Receiver); // HitOwner pointer
-    URHO3D_PARAM(P_HITDETECTOR, HitDetector); // HitDetector pointer
-    URHO3D_PARAM(P_HITTRIGGER, HitTrigger); // HitTrigger pointer
+    URHO3D_PARAM(P_DETECTOR, Detector); // HitOwner pointer
+    URHO3D_PARAM(P_DETECTOR_GROUP, DetectorGroup); // string
+    URHO3D_PARAM(P_TRIGGER, Trigger); // HitOwner pointer
+    URHO3D_PARAM(P_TRIGGER_GROUP, DetectorGroup); // string
     URHO3D_PARAM(P_ID, Id); // int
 }
 
 URHO3D_EVENT(E_HITSTOPPED, HitStopped)
 {
-    URHO3D_PARAM(P_RECEIVER, Receiver); // HitOwner pointer
-    URHO3D_PARAM(P_HITDETECTOR, HitDetector); // HitDetector pointer
-    URHO3D_PARAM(P_HITTRIGGER, HitTrigger); // HitTrigger pointer
+    URHO3D_PARAM(P_DETECTOR, Detector); // HitOwner pointer
+    URHO3D_PARAM(P_DETECTOR_GROUP, DetectorGroup); // string
+    URHO3D_PARAM(P_TRIGGER, Trigger); // HitOwner pointer
+    URHO3D_PARAM(P_TRIGGER_GROUP, DetectorGroup); // string
     URHO3D_PARAM(P_ID, Id); // int
 }
 
@@ -40,7 +42,7 @@ public:
     static void RegisterObject(Context* context);
 
     /// Enumerate all active hits happening in the scene.
-    void EnumerateActiveHits(ea::vector<ea::pair<HitOwner*, const HitInfo*>>& hits);
+    void EnumerateActiveHits(ea::vector<const GroupHitInfo*>& hits);
 
     /// Attributes.
     /// @{
@@ -62,7 +64,7 @@ protected:
     /// @}
 
 private:
-    void Update();
+    void Update(VariantMap& eventData);
 
     unsigned triggerCollisionMask_{DefaultCollisionMask};
     unsigned triggerCollisionLayer_{DefaultCollisionLayer};

@@ -9,6 +9,47 @@
 namespace Urho3D
 {
 
+namespace
+{
+
+bool IsExpiredHit(const ComponentHitInfo& hit)
+{
+    return !hit.detector_ || !hit.trigger_;
+}
+
+bool IsSameHit(const ComponentHitInfo& hit, HitDetector* detector, HitTrigger* trigger)
+{
+    return hit.detector_ == detector && hit.trigger_ == trigger;
+}
+
+bool IsSameHit(const GroupHitInfo& hit, HitOwner* detectorOwner, HitOwner* triggerOwner,
+    const ea::string& detectorGroupId, const ea::string& triggerGroupId)
+{
+    return hit.detector_ == detectorOwner && hit.trigger_ == triggerOwner && hit.detectorGroup_ == detectorGroupId
+        && hit.triggerGroup_ == triggerGroupId;
+}
+
+bool IsComponentHitActive(HitOwner* detectorOwner, HitDetector* detector, HitTrigger* trigger)
+{
+    return detectorOwner->IsEnabled() && trigger->IsEnabledForDetector(detector);
+}
+
+bool HasHitInCollection(ea::span<const GroupHitInfo> collection, HitOwner* detectorOwner, HitOwner* triggerOwner,
+    const ea::string& detectorGroupId, const ea::string& triggerGroupId)
+{
+    return ea::any_of(collection.begin(), collection.end(), [&](const GroupHitInfo& hit) //
+    { //
+        return IsSameHit(hit, detectorOwner, triggerOwner, detectorGroupId, triggerGroupId);
+    });
+}
+
+bool IsGroupMergeKeyEqual(const GroupHitInfo& lhs, const GroupHitInfo& rhs)
+{
+    return lhs.MergeKey() == rhs.MergeKey();
+};
+
+} // namespace
+
 HitOwner::HitOwner(Context* context)
     : TrackedComponent<TrackedComponentBase, HitManager>(context)
 {
@@ -19,62 +60,129 @@ void HitOwner::RegisterObject(Context* context)
     context->RegisterFactory<HitOwner>(Category_User);
 
     URHO3D_ACCESSOR_ATTRIBUTE("Is Enabled", IsEnabled, SetEnabled, bool, true, AM_DEFAULT);
+    URHO3D_ACCESSOR_ATTRIBUTE("Trigger Fade Out", GetTriggerFadeOut, SetTriggerFadeOut, float, 0.0f, AM_DEFAULT);
 }
 
-const HitInfo* HitOwner::GetHitInfo(HitId id) const
+const GroupHitInfo* HitOwner::GetHitInfo(HitId id) const
 {
-    const auto iter = ea::find_if(hits_.begin(), hits_.end(), [id](const HitInfo& hit) { return hit.id_ == id; });
-    return iter != hits_.end() ? &*iter : nullptr;
+    const auto isSameId = [id](const GroupHitInfo& hit) { return hit.id_ == id; };
+    const auto iter = ea::find_if(groupHits_.begin(), groupHits_.end(), isSameId);
+    return iter != groupHits_.end() ? &*iter : nullptr;
 }
 
-void HitOwner::UpdateEvents()
+void HitOwner::RemoveExpiredRawHits()
 {
-    for (HitInfo& ongoingHit : hits_)
+    ea::erase_if(componentHits_, [](const ComponentHitInfo& hit) { return IsExpiredHit(hit); });
+}
+
+void HitOwner::CalculateGroupHits()
+{
+    ea::swap(groupHits_, previousGroupHits_);
+    groupHits_.clear();
+
+    for (const ComponentHitInfo& componentHit : componentHits_)
     {
-        const bool isActive = IsEnabled() && ongoingHit.trigger_ && ongoingHit.detector_
-            && ongoingHit.trigger_->IsEnabledForDetector(ongoingHit.detector_);
-        if (ongoingHit.isActive_ != isActive)
-        {
-            ongoingHit.isActive_ = isActive;
-            if (isActive)
-                OnHitStarted(ongoingHit);
-            else
-                OnHitStopped(ongoingHit);
-        }
+        const bool isActive = IsComponentHitActive(this, componentHit.detector_, componentHit.trigger_);
+        if (!isActive)
+            continue;
+
+        HitOwner* detectorOwner = componentHit.detector_->GetHitOwner();
+        URHO3D_ASSERT(detectorOwner == this);
+
+        HitOwner* triggerOwner = componentHit.trigger_->GetHitOwner();
+        const ea::string& detectorGroupId = componentHit.detector_->GetGroupId();
+        const ea::string& triggerGroupId = componentHit.trigger_->GetGroupId();
+        if (HasHitInCollection(groupHits_, detectorOwner, triggerOwner, detectorGroupId, triggerGroupId))
+            continue;
+
+        const WeakPtr<HitOwner> weakDetector{detectorOwner};
+        const WeakPtr<HitOwner> weakTrigger{triggerOwner};
+        groupHits_.push_back(GroupHitInfo{weakDetector, weakTrigger, detectorGroupId, triggerGroupId});
     }
 
-    ea::erase_if(hits_, [](const HitInfo& ongoingHit) { return ongoingHit.IsExpired(); });
+    // const auto isKeyLess = [](const GroupHitInfo& lhs, const GroupHitInfo& rhs) { return lhs.Key() < rhs.Key(); };
+    // ea::sort(groupHits_.begin(), groupHits_.end(), isKeyLess);
+}
+
+void HitOwner::StartAndStopHits(float timeStep)
+{
+    for (GroupHitInfo& groupHit : groupHits_)
+    {
+        const auto iterPrevious =
+            ea::find(previousGroupHits_.begin(), previousGroupHits_.end(), groupHit, IsGroupMergeKeyEqual);
+        if (iterPrevious == previousGroupHits_.end())
+        {
+            groupHit.id_ = GetNextId();
+            OnHitStarted(groupHit);
+            continue;
+        }
+
+        URHO3D_ASSERT(iterPrevious->id_ != HitId::Invalid);
+        groupHit.id_ = iterPrevious->id_;
+        iterPrevious->id_ = HitId::Invalid;
+    }
+
+    for (GroupHitInfo& groupHit : previousGroupHits_)
+    {
+        if (groupHit.id_ == HitId::Invalid)
+            continue;
+
+        if (!groupHit.timeToExpire_)
+        {
+            HitOwner* triggerOwner = groupHit.trigger_;
+            groupHit.timeToExpire_ = triggerOwner ? triggerOwner->GetTriggerFadeOut() : 0.0f;
+        }
+        else
+        {
+            *groupHit.timeToExpire_ -= timeStep;
+        }
+
+        if (*groupHit.timeToExpire_ <= 0.0f)
+        {
+            OnHitStopped(groupHit);
+            continue;
+        }
+
+        // Keep expiring hit for a while
+        groupHits_.push_back(groupHit);
+    }
+}
+
+void HitOwner::UpdateEvents(float timeStep)
+{
+    RemoveExpiredRawHits();
+    CalculateGroupHits();
+    StartAndStopHits(timeStep);
 }
 
 void HitOwner::AddOngoingHit(HitDetector* detector, HitTrigger* trigger)
 {
+    for (const ComponentHitInfo& hit : componentHits_)
+    {
+        if (IsSameHit(hit, detector, trigger))
+            return;
+    }
+
     const WeakPtr<HitDetector> weakDetector{detector};
     const WeakPtr<HitTrigger> weakTrigger{trigger};
-    const bool isActive = IsEnabled() && trigger->IsEnabledForDetector(detector);
-    hits_.emplace_back(HitInfo{weakDetector, weakTrigger, isActive, GetNextId()});
-    if (isActive)
-        OnHitStarted(hits_.back());
+    componentHits_.push_back(ComponentHitInfo{weakDetector, weakTrigger});
 }
 
 void HitOwner::RemoveOngoingHit(HitDetector* detector, HitTrigger* trigger)
 {
-    const auto checkAndRemoveHit = [&](const HitInfo& ongoingHit)
+    for (ComponentHitInfo& hit : componentHits_)
     {
-        if (ongoingHit.IsSame(detector, trigger))
+        if (IsSameHit(hit, detector, trigger))
         {
-            if (ongoingHit.isActive_)
-                OnHitStopped(ongoingHit);
-            return true;
+            hit = {};
+            return;
         }
-        return false;
-    };
-
-    ea::erase_if(hits_, checkAndRemoveHit);
+    }
 }
 
 HitId HitOwner::GetNextId()
 {
-    while (GetHitInfo(nextId_) != nullptr)
+    while (nextId_ == HitId::Invalid || GetHitInfo(nextId_) != nullptr)
         AdvanceNextId();
 
     const HitId id = nextId_;
@@ -82,25 +190,26 @@ HitId HitOwner::GetNextId()
     return id;
 }
 
-void HitOwner::SendEvent(StringHash eventType, const HitInfo& hit)
+void HitOwner::SendEvent(StringHash eventType, const GroupHitInfo& hit)
 {
     VariantMap& eventData = GetEventDataMap();
 
-    eventData[HitStarted::P_RECEIVER] = this;
-    eventData[HitStarted::P_HITDETECTOR] = hit.detector_;
-    eventData[HitStarted::P_HITTRIGGER] = hit.trigger_;
+    eventData[HitStarted::P_DETECTOR] = hit.detector_;
+    eventData[HitStarted::P_DETECTOR_GROUP] = hit.detectorGroup_;
+    eventData[HitStarted::P_TRIGGER] = hit.trigger_;
+    eventData[HitStarted::P_TRIGGER_GROUP] = hit.triggerGroup_;
     eventData[HitStarted::P_ID] = static_cast<unsigned>(hit.id_);
 
     node_->SendEvent(eventType, eventData);
     GetScene()->SendEvent(eventType, eventData);
 }
 
-void HitOwner::OnHitStarted(const HitInfo& hit)
+void HitOwner::OnHitStarted(const GroupHitInfo& hit)
 {
     SendEvent(E_HITSTARTED, hit);
 }
 
-void HitOwner::OnHitStopped(const HitInfo& hit)
+void HitOwner::OnHitStopped(const GroupHitInfo& hit)
 {
     SendEvent(E_HITSTOPPED, hit);
 }
@@ -114,6 +223,14 @@ HitComponent::~HitComponent()
 {
     if (rigidBody_)
         rigidBody_->Remove();
+}
+
+void HitComponent::RegisterObject(Context* context)
+{
+    context->RegisterFactory<HitComponent>(Category_User);
+
+    URHO3D_ACCESSOR_ATTRIBUTE("Is Enabled", IsEnabled, SetEnabled, bool, true, AM_DEFAULT);
+    URHO3D_ACCESSOR_ATTRIBUTE("Group Id", GetGroupId, SetGroupId, ea::string, EMPTY_STRING, AM_DEFAULT);
 }
 
 bool HitComponent::IsSelfAndOwnerEnabled()
@@ -153,7 +270,7 @@ void HitTrigger::RegisterObject(Context* context)
 {
     context->RegisterFactory<HitTrigger>(Category_User);
 
-    URHO3D_ACCESSOR_ATTRIBUTE("Is Enabled", IsEnabled, SetEnabled, bool, true, AM_DEFAULT);
+    URHO3D_COPY_BASE_ATTRIBUTES(HitComponent);
     URHO3D_ACCESSOR_ATTRIBUTE("Velocity Threshold", GetVelocityThreshold, SetVelocityThreshold, float, 0.0f, AM_DEFAULT);
 }
 
@@ -188,6 +305,8 @@ bool HitTrigger::IsVelocityThresholdSatisfied() const
 void HitDetector::RegisterObject(Context* context)
 {
     context->RegisterFactory<HitDetector>(Category_User);
+
+    URHO3D_COPY_BASE_ATTRIBUTES(HitComponent);
 }
 
 void HitDetector::DelayedStart()
@@ -230,13 +349,19 @@ void HitDetector::SetupRigidBody(HitManager* hitManager, RigidBody* rigidBody)
 void HitDetector::OnHitStarted(HitTrigger* hitTrigger)
 {
     if (HitOwner* hitOwner = GetHitOwner())
-        hitOwner->AddOngoingHit(this, hitTrigger);
+    {
+        if (hitOwner != hitTrigger->GetHitOwner())
+            hitOwner->AddOngoingHit(this, hitTrigger);
+    }
 }
 
 void HitDetector::OnHitStopped(HitTrigger* hitTrigger)
 {
     if (HitOwner* hitOwner = GetHitOwner())
-        hitOwner->RemoveOngoingHit(this, hitTrigger);
+    {
+        if (hitOwner != hitTrigger->GetHitOwner())
+            hitOwner->RemoveOngoingHit(this, hitTrigger);
+    }
 }
 
 } // namespace Urho3D

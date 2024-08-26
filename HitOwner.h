@@ -4,35 +4,44 @@
 
 #include <Urho3D/Scene/LogicComponent.h>
 
+#include <EASTL/tuple.h>
+
 namespace Urho3D
 {
 
 class HitDetector;
+class HitOwner;
 class HitTrigger;
 class RigidBody;
 
-/// Identifier of ongoing hit. Unique within the owner.
+/// Identifier of ongoing hit. Unique within the instance of HitOwner.
 enum class HitId : unsigned
 {
+    Invalid
 };
 
-/// Description of ongoing hit.
-struct PLUGIN_CORE_HITMANAGER_API HitInfo
+/// Description of ongoing physical volume hit between HitTrigger and HitDetector.
+/// Components that belong to the same HitOwner never hit each other.
+/// There is no other filtering at this level.
+struct PLUGIN_CORE_HITMANAGER_API ComponentHitInfo
 {
-    /// Hit detector. May be null if the detector is expired.
     WeakPtr<HitDetector> detector_;
-    /// Hit trigger. May be null if the trigger is expired.
     WeakPtr<HitTrigger> trigger_;
-    /// Whether the hit is active. Inactive hits should be ignored.
-    bool isActive_{};
-    /// Id is unique within the owner.
-    HitId id_{};
+};
 
-    bool IsExpired() const { return !detector_ || !trigger_; }
-    bool IsSame(HitDetector* detector, HitTrigger* trigger) const
-    {
-        return detector_ == detector && trigger_ == trigger;
-    }
+/// Description of logical hit between two HitOwner objects.
+struct PLUGIN_CORE_HITMANAGER_API GroupHitInfo
+{
+    WeakPtr<HitOwner> detector_;
+    WeakPtr<HitOwner> trigger_;
+    ea::string detectorGroup_;
+    ea::string triggerGroup_;
+    HitId id_{};
+    /// Time before already stopped hit expires.
+    ea::optional<float> timeToExpire_;
+
+    /// Merge key is used to compare and merge sets of hits from different frames.
+    auto MergeKey() const { return ea::tie(trigger_, detectorGroup_, triggerGroup_); }
 };
 
 class PLUGIN_CORE_HITMANAGER_API HitOwner : public TrackedComponent<TrackedComponentBase, HitManager>
@@ -43,28 +52,43 @@ public:
     HitOwner(Context* context);
     static void RegisterObject(Context* context);
 
-    /// Return all hits, both active and inactive.
-    const ea::vector<HitInfo>& GetHits() const { return hits_; }
+    /// Return all hits.
+    const ea::vector<GroupHitInfo>& GetHits() const { return groupHits_; }
     /// Find hit by ID.
-    const HitInfo* GetHitInfo(HitId id) const;
+    const GroupHitInfo* GetHitInfo(HitId id) const;
+
+    /// Attributes.
+    /// @{
+    void SetTriggerFadeOut(float value) { triggerFadeOut_ = value; }
+    float GetTriggerFadeOut() const { return triggerFadeOut_; }
+    /// @}
 
     /// Internal.
     /// @{
-    void UpdateEvents();
+    void UpdateEvents(float timeStep);
     void AddOngoingHit(HitDetector* detector, HitTrigger* trigger);
     void RemoveOngoingHit(HitDetector* detector, HitTrigger* trigger);
     /// @}
 
 private:
+    void RemoveExpiredRawHits();
+    void CalculateGroupHits();
+    void StartAndStopHits(float timeStep);
+
     void AdvanceNextId() { nextId_ = static_cast<HitId>(static_cast<unsigned>(nextId_) + 1); }
     HitId GetNextId();
-    void SendEvent(StringHash eventType, const HitInfo& hit);
 
-    void OnHitStarted(const HitInfo& hit);
-    void OnHitStopped(const HitInfo& hit);
+    void SendEvent(StringHash eventType, const GroupHitInfo& hit);
+    void OnHitStarted(const GroupHitInfo& hit);
+    void OnHitStopped(const GroupHitInfo& hit);
 
-    ea::vector<HitInfo> hits_;
+    ea::vector<ComponentHitInfo> componentHits_;
+    ea::vector<GroupHitInfo> groupHits_;
+    ea::vector<GroupHitInfo> previousGroupHits_;
+
     HitId nextId_{};
+
+    float triggerFadeOut_{};
 };
 
 class PLUGIN_CORE_HITMANAGER_API HitComponent : public LogicComponent
@@ -74,6 +98,7 @@ class PLUGIN_CORE_HITMANAGER_API HitComponent : public LogicComponent
 public:
     HitComponent(Context* context);
     ~HitComponent() override;
+    static void RegisterObject(Context* context);
 
     HitOwner* GetHitOwner();
     bool IsSelfAndOwnerEnabled();
@@ -81,6 +106,12 @@ public:
     /// Implement LogicComponent.
     /// @{
     void DelayedStart() override;
+    /// @}
+
+    /// Attributes.
+    /// @{
+    void SetGroupId(const ea::string& value) { groupId_ = value; }
+    const ea::string& GetGroupId() const { return groupId_; }
     /// @}
 
 protected:
@@ -91,6 +122,8 @@ protected:
 private:
     WeakPtr<RigidBody> rigidBody_;
     WeakPtr<HitOwner> hitOwner_;
+
+    ea::string groupId_;
 };
 
 class PLUGIN_CORE_HITMANAGER_API HitTrigger : public HitComponent

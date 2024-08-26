@@ -24,16 +24,13 @@ void HitManager::RegisterObject(Context* context)
     URHO3D_ATTRIBUTE("Detector Collision Layer", unsigned, detectorCollisionLayer_, DefaultCollisionLayer, AM_DEFAULT);
 }
 
-void HitManager::EnumerateActiveHits(ea::vector<ea::pair<HitOwner*, const HitInfo*>>& hits)
+void HitManager::EnumerateActiveHits(ea::vector<const GroupHitInfo*>& hits)
 {
     const auto owners = StaticCastSpan<HitOwner*>(GetTrackedComponents());
     for (HitOwner* owner : owners)
     {
-        for (const HitInfo& hit : owner->GetHits())
-        {
-            if (hit.isActive_)
-                hits.emplace_back(owner, &hit);
-        }
+        for (const GroupHitInfo& hit : owner->GetHits())
+            hits.emplace_back(&hit);
     }
 }
 
@@ -47,11 +44,14 @@ void HitManager::OnRemovedFromScene()
     UnsubscribeFromEvent(E_SCENESUBSYSTEMUPDATE);
 }
 
-void HitManager::Update()
+void HitManager::Update(VariantMap& eventData)
 {
+    URHO3D_PROFILE("Update Hits");
+
+    const float timeStep = eventData[SceneSubsystemUpdate::P_TIMESTEP].GetFloat();
     const auto owners = StaticCastSpan<HitOwner*>(GetTrackedComponents());
     for (HitOwner* owner : owners)
-        owner->UpdateEvents();
+        owner->UpdateEvents(timeStep);
 }
 
 } // namespace Urho3D
