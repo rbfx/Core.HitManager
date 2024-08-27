@@ -41,6 +41,7 @@ struct PLUGIN_CORE_HITMANAGER_API GroupHitInfo
     ea::optional<float> timeToExpire_;
 
     /// Merge key is used to compare and merge sets of hits from different frames.
+    /// Hits that belong to the same HitOwner are supposed to have unique key triplets.
     auto MergeKey() const { return ea::tie(trigger_, detectorGroup_, triggerGroup_); }
 };
 

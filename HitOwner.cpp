@@ -22,11 +22,10 @@ bool IsSameHit(const ComponentHitInfo& hit, HitDetector* detector, HitTrigger* t
     return hit.detector_ == detector && hit.trigger_ == trigger;
 }
 
-bool IsSameHit(const GroupHitInfo& hit, HitOwner* detectorOwner, HitOwner* triggerOwner,
+bool IsSameHit(const GroupHitInfo& hit, HitOwner* triggerOwner,
     const ea::string& detectorGroupId, const ea::string& triggerGroupId)
 {
-    return hit.detector_ == detectorOwner && hit.trigger_ == triggerOwner && hit.detectorGroup_ == detectorGroupId
-        && hit.triggerGroup_ == triggerGroupId;
+    return hit.trigger_ == triggerOwner && hit.detectorGroup_ == detectorGroupId && hit.triggerGroup_ == triggerGroupId;
 }
 
 bool IsComponentHitActive(HitOwner* detectorOwner, HitDetector* detector, HitTrigger* trigger)
@@ -34,12 +33,12 @@ bool IsComponentHitActive(HitOwner* detectorOwner, HitDetector* detector, HitTri
     return detectorOwner->IsEnabled() && trigger->IsEnabledForDetector(detector);
 }
 
-bool HasHitInCollection(ea::span<const GroupHitInfo> collection, HitOwner* detectorOwner, HitOwner* triggerOwner,
+bool HasHitInCollection(ea::span<const GroupHitInfo> collection, HitOwner* triggerOwner,
     const ea::string& detectorGroupId, const ea::string& triggerGroupId)
 {
     return ea::any_of(collection.begin(), collection.end(), [&](const GroupHitInfo& hit) //
     { //
-        return IsSameHit(hit, detectorOwner, triggerOwner, detectorGroupId, triggerGroupId);
+        return IsSameHit(hit, triggerOwner, detectorGroupId, triggerGroupId);
     });
 }
 
@@ -90,18 +89,21 @@ void HitOwner::CalculateGroupHits()
         URHO3D_ASSERT(detectorOwner == this);
 
         HitOwner* triggerOwner = componentHit.trigger_->GetHitOwner();
+        if (!triggerOwner)
+        {
+            URHO3D_ASSERTLOG(false, "HitOwner of the trigger is null");
+            continue;
+        }
+
         const ea::string& detectorGroupId = componentHit.detector_->GetGroupId();
         const ea::string& triggerGroupId = componentHit.trigger_->GetGroupId();
-        if (HasHitInCollection(groupHits_, detectorOwner, triggerOwner, detectorGroupId, triggerGroupId))
+        if (HasHitInCollection(groupHits_, triggerOwner, detectorGroupId, triggerGroupId))
             continue;
 
         const WeakPtr<HitOwner> weakDetector{detectorOwner};
         const WeakPtr<HitOwner> weakTrigger{triggerOwner};
         groupHits_.push_back(GroupHitInfo{weakDetector, weakTrigger, detectorGroupId, triggerGroupId});
     }
-
-    // const auto isKeyLess = [](const GroupHitInfo& lhs, const GroupHitInfo& rhs) { return lhs.Key() < rhs.Key(); };
-    // ea::sort(groupHits_.begin(), groupHits_.end(), isKeyLess);
 }
 
 void HitOwner::StartAndStopHits(float timeStep)
