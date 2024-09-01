@@ -18,10 +18,12 @@ void HitManager::RegisterObject(Context* context)
 {
     context->RegisterFactory<HitManager>(Category_User);
 
-    URHO3D_ATTRIBUTE("Trigger Collision Mask", unsigned, triggerCollisionMask_, DefaultCollisionMask, AM_DEFAULT);
-    URHO3D_ATTRIBUTE("Trigger Collision Layer", unsigned, triggerCollisionLayer_, DefaultCollisionLayer, AM_DEFAULT);
-    URHO3D_ATTRIBUTE("Detector Collision Mask", unsigned, detectorCollisionMask_, DefaultCollisionMask, AM_DEFAULT);
-    URHO3D_ATTRIBUTE("Detector Collision Layer", unsigned, detectorCollisionLayer_, DefaultCollisionLayer, AM_DEFAULT);
+    // clang-format off
+    URHO3D_ATTRIBUTE("Trigger Collision Mask", unsigned, triggerCollisionMask_, DefaultTriggerCollisionMask, AM_DEFAULT);
+    URHO3D_ATTRIBUTE("Trigger Collision Layer", unsigned, triggerCollisionLayer_, DefaultTriggerCollisionLayer, AM_DEFAULT);
+    URHO3D_ATTRIBUTE("Detector Collision Mask", unsigned, detectorCollisionMask_, DefaultDetectorCollisionMask, AM_DEFAULT);
+    URHO3D_ATTRIBUTE("Detector Collision Layer", unsigned, detectorCollisionLayer_, DefaultDetectorCollisionLayer, AM_DEFAULT);
+    // clang-format on
 }
 
 void HitManager::EnumerateActiveHits(ea::vector<const GroupHitInfo*>& hits)

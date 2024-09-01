@@ -35,8 +35,10 @@ class PLUGIN_CORE_HITMANAGER_API HitManager : public TrackedComponentRegistryBas
     URHO3D_OBJECT(HitManager, TrackedComponentRegistryBase);
 
 public:
-    static constexpr unsigned DefaultCollisionMask = 0x7000;
-    static constexpr unsigned DefaultCollisionLayer = 0x7000;
+    static constexpr unsigned DefaultTriggerCollisionLayer = 0x8000;
+    static constexpr unsigned DefaultDetectorCollisionLayer = 0x4000;
+    static constexpr unsigned DefaultTriggerCollisionMask = DefaultDetectorCollisionLayer;
+    static constexpr unsigned DefaultDetectorCollisionMask = DefaultTriggerCollisionLayer;
 
     HitManager(Context* context);
     static void RegisterObject(Context* context);
@@ -66,10 +68,10 @@ protected:
 private:
     void Update(VariantMap& eventData);
 
-    unsigned triggerCollisionMask_{DefaultCollisionMask};
-    unsigned triggerCollisionLayer_{DefaultCollisionLayer};
-    unsigned detectorCollisionMask_{DefaultCollisionMask};
-    unsigned detectorCollisionLayer_{DefaultCollisionLayer};
+    unsigned triggerCollisionMask_{DefaultTriggerCollisionMask};
+    unsigned triggerCollisionLayer_{DefaultTriggerCollisionLayer};
+    unsigned detectorCollisionMask_{DefaultDetectorCollisionMask};
+    unsigned detectorCollisionLayer_{DefaultDetectorCollisionLayer};
 };
 
 } // namespace Urho3D
