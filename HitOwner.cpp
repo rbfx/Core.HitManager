@@ -249,7 +249,7 @@ HitOwner* HitComponent::GetHitOwner()
 
     hitOwner = node_->GetComponent<HitOwner>();
     if (!hitOwner)
-        hitOwner = node_->GetParentComponent<HitOwner>(true);
+        hitOwner = node_->FindComponent<HitOwner>(ComponentSearchFlag::ParentRecursive);
 
     hitOwner_ = hitOwner;
     return hitOwner;
