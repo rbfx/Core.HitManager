@@ -14,6 +14,7 @@ void RegisterPluginObjects(PluginApplication& plugin)
 {
     plugin.RegisterObject<HitManager>();
     plugin.RegisterObject<HitOwner>();
+    plugin.RegisterObject<HitComponent>();
     plugin.RegisterObject<HitDetector>();
     plugin.RegisterObject<HitTrigger>();
 }
