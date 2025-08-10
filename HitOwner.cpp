@@ -56,7 +56,7 @@ HitOwner::HitOwner(Context* context)
 
 void HitOwner::RegisterObject(Context* context)
 {
-    context->RegisterFactory<HitOwner>(Category_User);
+    context->RegisterFactory<HitOwner>(Category_Plugin_HitManager);
 
     URHO3D_ACCESSOR_ATTRIBUTE("Is Enabled", IsEnabled, SetEnabled, bool, true, AM_DEFAULT);
     URHO3D_ACCESSOR_ATTRIBUTE("Trigger Fade Out", GetTriggerFadeOut, SetTriggerFadeOut, float, 0.0f, AM_DEFAULT);
@@ -229,7 +229,7 @@ HitComponent::~HitComponent()
 
 void HitComponent::RegisterObject(Context* context)
 {
-    context->RegisterFactory<HitComponent>(Category_User);
+    context->RegisterFactory<HitComponent>(Category_Plugin_HitManager);
 
     URHO3D_ACCESSOR_ATTRIBUTE("Is Enabled", IsEnabled, SetEnabled, bool, true, AM_DEFAULT);
     URHO3D_ACCESSOR_ATTRIBUTE("Group Id", GetGroupId, SetGroupId, ea::string, EMPTY_STRING, AM_DEFAULT);
@@ -270,7 +270,7 @@ void HitComponent::DelayedStart()
 
 void HitTrigger::RegisterObject(Context* context)
 {
-    context->RegisterFactory<HitTrigger>(Category_User);
+    context->RegisterFactory<HitTrigger>(Category_Plugin_HitManager);
 
     URHO3D_COPY_BASE_ATTRIBUTES(HitComponent);
     URHO3D_ACCESSOR_ATTRIBUTE("Velocity Threshold", GetVelocityThreshold, SetVelocityThreshold, float, 0.0f, AM_DEFAULT);
@@ -306,7 +306,7 @@ bool HitTrigger::IsVelocityThresholdSatisfied() const
 
 void HitDetector::RegisterObject(Context* context)
 {
-    context->RegisterFactory<HitDetector>(Category_User);
+    context->RegisterFactory<HitDetector>(Category_Plugin_HitManager);
 
     URHO3D_COPY_BASE_ATTRIBUTES(HitComponent);
 }

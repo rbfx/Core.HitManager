@@ -16,7 +16,7 @@ HitManager::HitManager(Context* context)
 
 void HitManager::RegisterObject(Context* context)
 {
-    context->RegisterFactory<HitManager>(Category_User);
+    context->RegisterFactory<HitManager>(Category_Plugin_HitManager);
 
     // clang-format off
     URHO3D_ATTRIBUTE("Trigger Collision Mask", unsigned, triggerCollisionMask_, DefaultTriggerCollisionMask, AM_DEFAULT);
