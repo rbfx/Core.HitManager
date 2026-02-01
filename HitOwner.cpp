@@ -263,8 +263,8 @@ void HitComponent::DelayedStart()
     {
         rigidBody_ = node_->CreateComponent<RigidBody>();
 
-        auto hitManager = node_->GetScene()->GetOrCreateComponent<HitManager>();
-        SetupRigidBody(hitManager, rigidBody_);
+        if (auto hitManager = node_->GetScene()->GetComponent<HitManager>())
+            SetupRigidBody(hitManager, rigidBody_);
     }
 }
 
